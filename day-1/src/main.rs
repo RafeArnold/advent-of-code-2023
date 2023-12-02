@@ -64,7 +64,7 @@ fn last_digit_2(chars: &[u8]) -> u64 {
 }
 
 fn get_digit<'a>(mut chars: impl Iterator<Item = &'a u8>) -> Option<u64> {
-    return match chars.next() {
+    match chars.next() {
         Some(c @ b'0'..=b'9') => Some((*c - b'0') as u64),
         Some(b'o') => expect(chars, b"ne", 1),
         Some(b't') => match chars.next() {
@@ -84,8 +84,8 @@ fn get_digit<'a>(mut chars: impl Iterator<Item = &'a u8>) -> Option<u64> {
         },
         Some(b'e') => expect(chars, b"ight", 8),
         Some(b'n') => expect(chars, b"ine", 9),
-        _ => return None,
-    };
+        _ => None,
+    }
 }
 
 fn expect<'a>(mut chars: impl Iterator<Item = &'a u8>, expected: &[u8], digit: u64) -> Option<u64> {
