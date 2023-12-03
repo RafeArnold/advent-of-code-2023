@@ -10,18 +10,7 @@ fn run_1(input: &[u8]) -> usize {
     let mut op = |num| sum += num;
     for (idx, c) in input.iter().enumerate() {
         if is_symbol(*c) {
-            // Check above.
-            read_vertical(input, idx, width, &mut op, Vertical::Above);
-            // Check below.
-            read_vertical(input, idx, width, &mut op, Vertical::Below);
-            // Check left.
-            if let Some(left_idx) = idx.checked_sub(1) {
-                read_number(input, left_idx, width, &mut op);
-            }
-            // Check right.
-            if let Some(right_idx) = idx.checked_add(1) {
-                read_number(input, right_idx, width, &mut op);
-            }
+            read_surrounding_numbers(input, idx, width, &mut op);
         }
     }
     sum
@@ -33,19 +22,8 @@ fn run_2(input: &[u8]) -> usize {
     for (idx, c) in input.iter().enumerate() {
         if *c == b'*' {
             let mut part_numbers = Vec::new();
-            let mut op = |num| part_numbers.push(num);
-            // Check above.
-            read_vertical(input, idx, width, &mut op, Vertical::Above);
-            // Check below.
-            read_vertical(input, idx, width, &mut op, Vertical::Below);
-            // Check left.
-            if let Some(left_idx) = idx.checked_sub(1) {
-                read_number(input, left_idx, width, &mut op);
-            }
-            // Check right.
-            if let Some(right_idx) = idx.checked_add(1) {
-                read_number(input, right_idx, width, &mut op);
-            }
+            let op = |num| part_numbers.push(num);
+            read_surrounding_numbers(input, idx, width, op);
             if part_numbers.len() == 2 {
                 sum += part_numbers[0] * part_numbers[1];
             }
@@ -64,6 +42,28 @@ fn width(input: &[u8]) -> usize {
 
 fn is_symbol(c: u8) -> bool {
     !matches!(c, b'0'..=b'9' | b'.' | b'\n')
+}
+
+/// Reads any/all numbers surrounding `idx` in `input`, including diagonally, and performs `op` on
+/// each one.
+///
+/// * `width`: The width of each line of `input`, including the new line character.
+fn read_surrounding_numbers<F>(input: &[u8], idx: usize, width: usize, mut op: F)
+where
+    F: FnMut(usize) -> (),
+{
+    // Check above.
+    read_vertical(input, idx, width, &mut op, Vertical::Above);
+    // Check below.
+    read_vertical(input, idx, width, &mut op, Vertical::Below);
+    // Check left.
+    if let Some(left_idx) = idx.checked_sub(1) {
+        read_number(input, left_idx, width, &mut op);
+    }
+    // Check right.
+    if let Some(right_idx) = idx.checked_add(1) {
+        read_number(input, right_idx, width, &mut op);
+    }
 }
 
 /// Attempts to read any numbers above or below `idx` in `input`, including diagonally, and perform
