@@ -1,11 +1,28 @@
 fn main() {
     const INPUT: &str = include_str!("../input.txt");
     println!("{}", run_1(INPUT));
+    println!("{}", run_2(INPUT));
 }
 
 fn run_1(input: &str) -> usize {
-    let (seeds, maps) = parse_input(input);
-    seeds.into_iter().map(|seed| find_location(seed, &maps)).min().unwrap()
+    let (seeds, maps) = parse_input_1(input);
+    seeds
+        .into_iter()
+        .map(|seed| find_location(seed, &maps))
+        .min()
+        .unwrap()
+}
+
+fn run_2(input: &str) -> usize {
+    let (seeds, maps) = parse_input_2(input);
+    seeds
+        .into_iter()
+        .flat_map(|(seed_range_start, seed_range_length)| {
+            let maps = &maps;
+            (0..seed_range_length).map(move |i| find_location(seed_range_start + i, maps))
+        })
+        .min()
+        .unwrap()
 }
 
 fn find_location(seed: usize, maps: &Vec<Map>) -> usize {
@@ -16,9 +33,18 @@ fn find_location(seed: usize, maps: &Vec<Map>) -> usize {
     current
 }
 
-fn parse_input(input: &str) -> (Vec<usize>, Vec<Map>) {
+fn parse_input_1(input: &str) -> (Vec<usize>, Vec<Map>) {
     let (seeds, rest) = input.split_once("\n\n").unwrap();
     (parse_seeds(seeds), parse_maps(rest))
+}
+
+fn parse_input_2(input: &str) -> (Vec<(usize, usize)>, Vec<Map>) {
+    let (seed_ranges, rest) = input.split_once("\n\n").unwrap();
+    (parse_seed_ranges(seed_ranges), parse_maps(rest))
+}
+
+fn parse_seed_ranges(seeds: &str) -> Vec<(usize, usize)> {
+    parse_seeds(seeds).chunks(2).map(|pair| (pair[0], pair[1])).collect()
 }
 
 fn parse_seeds(seeds: &str) -> Vec<usize> {
@@ -86,9 +112,7 @@ impl Range {
 mod tests {
     use super::*;
 
-    #[test]
-    fn challenge_1() {
-        const INPUT: &str = "seeds: 79 14 55 13
+    const INPUT: &str = "seeds: 79 14 55 13
 
 seed-to-soil map:
 50 98 2
@@ -121,6 +145,14 @@ temperature-to-humidity map:
 humidity-to-location map:
 60 56 37
 56 93 4";
+
+    #[test]
+    fn challenge_1() {
         assert_eq!(run_1(INPUT), 35);
+    }
+
+    #[test]
+    fn challenge_2() {
+        assert_eq!(run_2(INPUT), 46);
     }
 }
