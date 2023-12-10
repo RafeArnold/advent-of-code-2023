@@ -5,9 +5,22 @@ use std::ops::Sub;
 fn main() {
     const INPUT: &str = include_str!("../input.txt");
     println!("{}", run_1(INPUT));
+    println!("{}", run_2(INPUT));
 }
 
 fn run_1(input: &str) -> usize {
+    run::<Hand, _>(input, parse_line)
+}
+
+fn run_2(input: &str) -> usize {
+    run::<Hand2, _>(input, parse_line_2)
+}
+
+fn run<H, F>(input: &str, parse_line: F) -> usize
+where
+    H: Ord,
+    F: Fn(&str) -> (H, usize),
+{
     let mut hands = input.lines().map(parse_line).collect::<Vec<_>>();
     hands.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
     hands
@@ -15,6 +28,11 @@ fn run_1(input: &str) -> usize {
         .enumerate()
         .map(|(rank, (_hand, bid))| (rank + 1) * bid)
         .sum()
+}
+
+fn parse_line_2(line: &str) -> (Hand2, usize) {
+    let (hand, bid) = parse_line(line);
+    (hand.into(), bid)
 }
 
 fn parse_line(line: &str) -> (Hand, usize) {
@@ -29,11 +47,26 @@ struct Hand {
     cards: [Card; 5],
 }
 
+#[derive(Debug, Eq, PartialEq)]
+struct Hand2 {
+    cards: [Card; 5],
+}
+
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
 enum Card {
     Num(u8),
     T,
     J,
+    Q,
+    K,
+    A,
+}
+
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
+enum Card2 {
+    J,
+    Num(u8),
+    T,
     Q,
     K,
     A,
@@ -48,6 +81,19 @@ enum Kind {
     FullHouse,
     Four,
     Five,
+}
+
+impl From<&Card> for Card2 {
+    fn from(value: &Card) -> Self {
+        match value {
+            Card::Num(num) => Card2::Num(*num),
+            Card::T => Card2::T,
+            Card::J => Card2::J,
+            Card::Q => Card2::Q,
+            Card::K => Card2::K,
+            Card::A => Card2::A,
+        }
+    }
 }
 
 impl Ord for Hand {
@@ -71,6 +117,25 @@ impl PartialEq<Self> for Hand {
     }
 }
 
+impl Ord for Hand2 {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.kind().cmp(&other.kind()) {
+            Ordering::Equal => self
+                .cards
+                .iter()
+                .map(Card2::from)
+                .cmp(other.cards.iter().map(Card2::from)),
+            cmp => cmp,
+        }
+    }
+}
+
+impl PartialOrd<Self> for Hand2 {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 impl Hand {
     fn kind(&self) -> Kind {
         let mut groups: [u8; 13] = [0; 13];
@@ -79,21 +144,43 @@ impl Hand {
         }
         groups.sort_unstable();
         groups.reverse();
-        if groups[0] == 5 {
-            Kind::Five
-        } else if groups[0] == 4 {
-            Kind::Four
-        } else if groups[0] == 3 && groups[1] == 2 {
-            Kind::FullHouse
-        } else if groups[0] == 3 {
-            Kind::Three
-        } else if groups[0] == 2 && groups[1] == 2 {
-            Kind::TwoPair
-        } else if groups[0] == 2 {
-            Kind::Pair
-        } else {
-            Kind::High
+        kind(groups)
+    }
+}
+
+impl Hand2 {
+    fn kind(&self) -> Kind {
+        let mut groups: [u8; 13] = [0; 13];
+        let mut j_count = 0;
+        for card in &self.cards {
+            if let Card::J = card {
+                j_count += 1;
+            } else {
+                groups[card.value() as usize] += 1;
+            }
         }
+        groups.sort_unstable();
+        groups.reverse();
+        groups[0] += j_count;
+        kind(groups)
+    }
+}
+
+fn kind(groups: [u8; 13]) -> Kind {
+    if groups[0] == 5 {
+        Kind::Five
+    } else if groups[0] == 4 {
+        Kind::Four
+    } else if groups[0] == 3 && groups[1] == 2 {
+        Kind::FullHouse
+    } else if groups[0] == 3 {
+        Kind::Three
+    } else if groups[0] == 2 && groups[1] == 2 {
+        Kind::TwoPair
+    } else if groups[0] == 2 {
+        Kind::Pair
+    } else {
+        Kind::High
     }
 }
 
@@ -124,6 +211,12 @@ impl TryFrom<&str> for Hand {
             cards.next().ok_or(ParseHandError::TooFewCards)??,
         ];
         Ok(Hand { cards })
+    }
+}
+
+impl From<Hand> for Hand2 {
+    fn from(value: Hand) -> Self {
+        Hand2 { cards: value.cards }
     }
 }
 
@@ -178,6 +271,11 @@ QQQJA 483";
     }
 
     #[test]
+    fn challenge_2() {
+        assert_eq!(run_2(INPUT), 5905);
+    }
+
+    #[test]
     fn cmp() {
         let a = Hand::try_from("KK677").unwrap();
         let b = Hand::try_from("KTJJT").unwrap();
@@ -193,5 +291,19 @@ QQQJA 483";
         assert_eq!(Hand::try_from("23432").unwrap().kind(), Kind::TwoPair);
         assert_eq!(Hand::try_from("A23A4").unwrap().kind(), Kind::Pair);
         assert_eq!(Hand::try_from("23456").unwrap().kind(), Kind::High);
+    }
+
+    #[test]
+    fn cmp_2() {
+        let a = Hand2::from(Hand::try_from("TTTT2").unwrap());
+        let b = Hand2::from(Hand::try_from("JKKK2").unwrap());
+        assert_eq!(a.cmp(&b), Ordering::Greater);
+        assert!(a > b);
+    }
+
+    #[test]
+    fn kind_2() {
+        let hand = Hand2::from(Hand::try_from("QJJQ2").unwrap());
+        assert_eq!(hand.kind(), Kind::Four);
     }
 }
