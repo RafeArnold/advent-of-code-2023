@@ -50,7 +50,7 @@ fn is_symbol(c: u8) -> bool {
 /// * `width`: The width of each line of `input`, including the new line character.
 fn read_surrounding_numbers<F>(input: &[u8], idx: usize, width: usize, mut op: F)
 where
-    F: FnMut(usize) -> (),
+    F: FnMut(usize),
 {
     // Check above.
     read_vertical(input, idx, width, &mut op, Vertical::Above);
@@ -72,7 +72,7 @@ where
 /// * `width`: The width of each line of `input`, including the new line character.
 fn read_vertical<F>(input: &[u8], idx: usize, width: usize, mut num_op: F, pole: Vertical)
 where
-    F: FnMut(usize) -> (),
+    F: FnMut(usize),
 {
     let op = match pole {
         Vertical::Above => usize::checked_sub,
@@ -107,9 +107,9 @@ enum Vertical {
 /// * `width`: The width of each line of `input`, including the new line character.
 fn read_number<F>(input: &[u8], idx: usize, width: usize, mut op: F) -> bool
 where
-    F: FnMut(usize) -> (),
+    F: FnMut(usize),
 {
-    if idx >= input.len() || !is_digit(input[idx]) {
+    if idx >= input.len() || !input[idx].is_ascii_digit() {
         return false;
     }
     let mut first_idx = idx;
@@ -117,7 +117,7 @@ where
         first_idx
             .checked_sub(1)
             .filter(|idx| idx % width != width - 1)
-            .map(|idx| is_digit(input[idx])),
+            .map(|idx| input[idx].is_ascii_digit()),
         Some(true)
     ) {
         first_idx -= 1;
@@ -127,7 +127,7 @@ where
         last_idx
             .checked_add(1)
             .filter(|idx| idx % width != 0)
-            .map(|idx| is_digit(input[idx])),
+            .map(|idx| input[idx].is_ascii_digit()),
         Some(true)
     ) {
         last_idx += 1;
@@ -137,10 +137,6 @@ where
         .parse::<usize>()
         .unwrap());
     true
-}
-
-fn is_digit(c: u8) -> bool {
-    matches!(c, b'0'..=b'9')
 }
 
 #[cfg(test)]
