@@ -44,7 +44,10 @@ fn parse_input_2(input: &str) -> (Vec<(usize, usize)>, Vec<Map>) {
 }
 
 fn parse_seed_ranges(seeds: &str) -> Vec<(usize, usize)> {
-    parse_seeds(seeds).chunks(2).map(|pair| (pair[0], pair[1])).collect()
+    parse_seeds(seeds)
+        .chunks(2)
+        .map(|pair| (pair[0], pair[1]))
+        .collect()
 }
 
 fn parse_seeds(seeds: &str) -> Vec<usize> {
