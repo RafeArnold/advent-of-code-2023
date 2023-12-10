@@ -30,7 +30,6 @@ struct Hand {
 }
 
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
-#[repr(u8)]
 enum Card {
     Num(u8),
     T,
