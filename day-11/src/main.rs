@@ -3,9 +3,18 @@ use std::cmp::{max, min};
 fn main() {
     const INPUT: &[u8; 19739] = include_bytes!("../input.txt");
     println!("{}", run_1(INPUT));
+    println!("{}", run_2(INPUT));
 }
 
 fn run_1(input: &[u8]) -> usize {
+    run(input, 2)
+}
+
+fn run_2(input: &[u8]) -> usize {
+    run(input, 1000000)
+}
+
+fn run(input: &[u8], factor: usize) -> usize {
     let width = input.iter().position(|b| *b == b'\n').unwrap();
     let universe = input.split(|b| *b == b'\n').collect::<Vec<_>>();
     let expanded_rows = universe
@@ -35,10 +44,12 @@ fn run_1(input: &[u8]) -> usize {
             sum += other.1.abs_diff(galaxy.1);
             sum += (min(other.0, galaxy.0)..max(other.0, galaxy.0))
                 .filter(|row_idx| expanded_rows[*row_idx])
-                .count();
+                .count()
+                * (factor - 1);
             sum += (min(other.1, galaxy.1)..max(other.1, galaxy.1))
                 .filter(|col_idx| expanded_cols[*col_idx])
-                .count();
+                .count()
+                * (factor - 1);
         }
     }
     sum
@@ -62,5 +73,11 @@ mod tests {
     #[test]
     fn challenge_1() {
         assert_eq!(run_1(INPUT), 374);
+    }
+
+    #[test]
+    fn challenge_2() {
+        assert_eq!(run(INPUT, 10), 1030);
+        assert_eq!(run(INPUT, 100), 8410);
     }
 }
