@@ -4,14 +4,39 @@ use std::collections::HashMap;
 fn main() {
     const INPUT: &[u8; 12209] = include_bytes!("../input.txt");
     println!("{}", run_1(INPUT));
+    println!("{}", run_2(INPUT));
 }
 
 fn run_1(input: &[u8]) -> usize {
     let grid = input.split(|b| *b == b'\n').collect::<Vec<_>>();
     let facing = Right;
     let pos = (0, 0);
+    run(&grid, facing, pos)
+}
+
+fn run_2(input: &[u8]) -> usize {
+    let grid = input.split(|b| *b == b'\n').collect::<Vec<_>>();
+    let width = grid[0].len();
+    (0..grid.len())
+        .flat_map(|row_idx| {
+            [
+                run(&grid, Right, (0, row_idx)),
+                run(&grid, Left, (width - 1, row_idx)),
+            ]
+        })
+        .chain((0..width).flat_map(|col_idx| {
+            [
+                run(&grid, Down, (col_idx, 0)),
+                run(&grid, Up, (col_idx, grid.len() - 1)),
+            ]
+        }))
+        .max()
+        .unwrap()
+}
+
+fn run(grid: &[&[u8]], facing: Direction, pos: (usize, usize)) -> usize {
     let mut visited = HashMap::<(usize, usize), Vec<Direction>>::new();
-    step(&grid, facing, pos, &mut visited);
+    step(grid, facing, pos, &mut visited);
     visited.len()
 }
 
@@ -141,5 +166,10 @@ mod tests {
     #[test]
     fn challenge_1() {
         assert_eq!(run_1(INPUT), 46);
+    }
+
+    #[test]
+    fn challenge_2() {
+        assert_eq!(run_2(INPUT), 51);
     }
 }
