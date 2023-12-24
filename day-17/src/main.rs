@@ -10,47 +10,36 @@ fn run_1(input: &[u8]) -> usize {
     let grid = input.split(|b| *b == b'\n').collect::<Vec<_>>();
     let start = (0, 0);
     let finish = (grid.len() - 1, grid[0].len() - 1);
-    let mut start_state = State::new(start, finish);
-    start_state.set_distance_from(finish);
+    let start_state = State::new(start, finish);
 
     let mut queue = BinaryHeap::new();
     queue.push(Reverse(start_state));
 
-    let mut visited = HashSet::<(usize, usize)>::new();
+    let mut visited = HashSet::<((usize, usize), (isize, isize))>::new();
 
     loop {
         let state = queue.pop().unwrap().0;
 
-        // draw(&state, &grid);
         if state.pos == finish {
             return state.heat_loss;
         }
 
-        visited.insert(state.pos);
+        if visited.contains(&(state.pos, state.prev_move)) {
+            continue;
+        }
+        visited.insert((state.pos, state.prev_move));
 
         let moves = HashSet::<(isize, isize)>::from([(0, -1), (-1, 0), (0, 1), (1, 0)]);
-        let diff = if let Some(last) = state.path.last() {
-            let (dx, dy) = (
-                state.pos.0 as isize - last.0 as isize,
-                state.pos.1 as isize - last.1 as isize,
-            );
-            HashSet::from([(dx, dy), (-dx, -dy)])
-        } else {
-            HashSet::new()
-        };
+        let (dx, dy) = state.prev_move;
+        let diff = HashSet::from([(dx, dy), (-dx, -dy)]);
 
         for &(dx, dy) in moves.difference(&diff) {
             let mut prev_state = state.clone();
 
             for _ in 0..3 {
                 if let Some(new_state) = prev_state.try_move((dx, dy), &grid, finish) {
-                    if !visited.contains(&new_state.pos) {
-                        queue.push(Reverse(new_state.clone()));
-
-                        prev_state = new_state.clone();
-                    } else {
-                        break;
-                    }
+                    queue.push(Reverse(new_state.clone()));
+                    prev_state = new_state.clone();
                 } else {
                     break;
                 }
@@ -59,61 +48,12 @@ fn run_1(input: &[u8]) -> usize {
     }
 }
 
-fn draw(state: &State, grid: &[&[u8]]) {
-    if state.path.is_empty() {
-        return;
-    }
-    let mut new_grid = Vec::new();
-    for row in grid {
-        let mut new_row = Vec::new();
-        for tile in *row {
-            new_row.push(*tile as char);
-        }
-        new_grid.push(new_row);
-    }
-    for window in state.path.windows(2) {
-        put_char(window[0], window[1], &mut new_grid);
-    }
-    put_char(*state.path.last().unwrap(), state.pos, &mut new_grid);
-    new_grid[state.pos.1][state.pos.0] = '.';
-    let str = new_grid
-        .into_iter()
-        .map(|row| row.into_iter().collect::<String>())
-        .collect::<Vec<_>>()
-        .join("\n");
-    println!(
-        "\n{}",
-        &state
-            .path
-            .iter()
-            .map(|(dx, dy)| format!("({dx}, {dy})"))
-            .collect::<Vec<String>>()
-            .join(", ")
-    );
-    println!("{str}");
-}
-
-fn put_char(old_pos: (usize, usize), new_pos: (usize, usize), grid: &mut Vec<Vec<char>>) {
-    let (dx, dy) = (
-        new_pos.0 as isize - old_pos.0 as isize,
-        new_pos.1 as isize - old_pos.1 as isize,
-    );
-    let char = match (dx, dy) {
-        (0, -1) => '^',
-        (0, 1) => 'v',
-        (-1, 0) => '<',
-        (1, 0) => '>',
-        _ => '.',
-    };
-    grid[old_pos.1][old_pos.0] = char;
-}
-
 #[derive(Clone)]
 struct State {
     heat_loss: usize,
     distance_from_finish: usize,
     pos: (usize, usize),
-    path: Vec<(usize, usize)>,
+    prev_move: (isize, isize),
 }
 
 impl State {
@@ -122,7 +62,7 @@ impl State {
             heat_loss: 0,
             distance_from_finish: 0,
             pos,
-            path: vec![],
+            prev_move: (0, 0),
         };
         s.set_distance_from(finish);
         s
@@ -137,8 +77,8 @@ impl State {
         let mut new_state = self.clone();
         new_state.pos.0 = try_move_single(new_state.pos.0, dx, grid[0].len())?;
         new_state.pos.1 = try_move_single(new_state.pos.1, dy, grid.len())?;
-        new_state.path.push(self.pos);
-        new_state.add_heat_loss(&grid);
+        new_state.prev_move = (dx, dy);
+        new_state.add_heat_loss(grid);
         new_state.set_distance_from(finish);
         Some(new_state)
     }
@@ -153,15 +93,7 @@ impl State {
 }
 
 fn try_move_single(p: usize, d: isize, max: usize) -> Option<usize> {
-    if let Some(new_p) = p.checked_add_signed(d) {
-        if new_p < max {
-            Some(new_p)
-        } else {
-            None
-        }
-    } else {
-        None
-    }
+    p.checked_add_signed(d).filter(|new_p| *new_p < max)
 }
 
 impl Ord for State {
@@ -216,13 +148,26 @@ mod tests {
             heat_loss: 15,
             distance_from_finish: 20,
             pos: (3, 1),
-            path: vec![(0, 0), (0, 1), (1, 1), (2, 1), (2, 0), (3, 0), (3, 1)],
+            prev_move: (0, 0),
         };
         let b = State {
             heat_loss: 11,
             distance_from_finish: 20,
             pos: (3, 1),
-            path: vec![(0, 0), (0, 1), (1, 1), (2, 1), (3, 1)],
+            prev_move: (0, 0),
+        };
+        assert_eq!(b.cmp(&a), Ordering::Less);
+        let a = State {
+            heat_loss: 10,
+            distance_from_finish: 22,
+            pos: (3, 1),
+            prev_move: (0, 0),
+        };
+        let b = State {
+            heat_loss: 11,
+            distance_from_finish: 20,
+            pos: (3, 1),
+            prev_move: (0, 0),
         };
         assert_eq!(b.cmp(&a), Ordering::Less);
     }
