@@ -8,45 +8,53 @@ fn main() {
 
 fn run_1(input: &[u8]) -> usize {
     let grid = input.split(|b| *b == b'\n').collect::<Vec<_>>();
-    let mut queue = BinaryHeap::new();
-    // let mut visited = HashSet::<((usize, usize), (usize, usize))>::new();
     let start = (0, 0);
     let finish = (grid.len() - 1, grid[0].len() - 1);
     let mut start_state = State::new(start, finish);
     start_state.set_distance_from(finish);
+
+    let mut queue = BinaryHeap::new();
     queue.push(Reverse(start_state));
+
     let mut visited = HashSet::<(usize, usize)>::new();
 
     loop {
         let state = queue.pop().unwrap().0;
+
         // draw(&state, &grid);
         if state.pos == finish {
             return state.heat_loss;
         }
+
         visited.insert(state.pos);
+
         let moves = HashSet::<(isize, isize)>::from([(0, -1), (-1, 0), (0, 1), (1, 0)]);
-        // let diff = if let Some(&last) = state.path.last() {
-        //     HashSet::from([last, (-last.0, -last.1)])
-        // } else {
-        //     HashSet::new()
-        // };
+        let diff = if let Some(last) = state.path.last() {
+            let (dx, dy) = (
+                state.pos.0 as isize - last.0 as isize,
+                state.pos.1 as isize - last.1 as isize,
+            );
+            HashSet::from([(dx, dy), (-dx, -dy)])
+        } else {
+            HashSet::new()
+        };
 
-        for (dx, dy) in moves {
-            // let mut prev_state = state.clone();
+        for &(dx, dy) in moves.difference(&diff) {
+            let mut prev_state = state.clone();
 
-            // for _ in 0..3 {
-            if let Some(new_state) = state.try_move((dx, dy), &grid, finish) {
-                if !visited.contains(&new_state.pos) {
-                    queue.push(Reverse(new_state.clone()));
+            for _ in 0..3 {
+                if let Some(new_state) = prev_state.try_move((dx, dy), &grid, finish) {
+                    if !visited.contains(&new_state.pos) {
+                        queue.push(Reverse(new_state.clone()));
+
+                        prev_state = new_state.clone();
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
                 }
             }
-            // if visited.contains(&(prev_state.pos, new_state.pos)) {
-            //     break;
-            // }
-            // visited.insert((prev_state.pos, new_state.pos));
-
-            // prev_state = new_state.clone();
-            // }
         }
     }
 }
@@ -64,22 +72,10 @@ fn draw(state: &State, grid: &[&[u8]]) {
         new_grid.push(new_row);
     }
     for window in state.path.windows(2) {
-        let old_pos = window[0];
-        let new_pos = window[1];
-        let (dx, dy) = (
-            new_pos.0 as isize - old_pos.0 as isize,
-            new_pos.1 as isize - old_pos.1 as isize,
-        );
-        let char = match (dx, dy) {
-            (0, -1) => '^',
-            (0, 1) => 'v',
-            (-1, 0) => '<',
-            (1, 0) => '>',
-            _ => '.',
-        };
-        new_grid[old_pos.1][old_pos.0] = char;
+        put_char(window[0], window[1], &mut new_grid);
     }
-    new_grid[state.path.last().unwrap().1][state.path.last().unwrap().0] = '.';
+    put_char(*state.path.last().unwrap(), state.pos, &mut new_grid);
+    new_grid[state.pos.1][state.pos.0] = '.';
     let str = new_grid
         .into_iter()
         .map(|row| row.into_iter().collect::<String>())
@@ -97,6 +93,21 @@ fn draw(state: &State, grid: &[&[u8]]) {
     println!("{str}");
 }
 
+fn put_char(old_pos: (usize, usize), new_pos: (usize, usize), grid: &mut Vec<Vec<char>>) {
+    let (dx, dy) = (
+        new_pos.0 as isize - old_pos.0 as isize,
+        new_pos.1 as isize - old_pos.1 as isize,
+    );
+    let char = match (dx, dy) {
+        (0, -1) => '^',
+        (0, 1) => 'v',
+        (-1, 0) => '<',
+        (1, 0) => '>',
+        _ => '.',
+    };
+    grid[old_pos.1][old_pos.0] = char;
+}
+
 #[derive(Clone)]
 struct State {
     heat_loss: usize,
@@ -111,7 +122,7 @@ impl State {
             heat_loss: 0,
             distance_from_finish: 0,
             pos,
-            path: vec![pos],
+            path: vec![],
         };
         s.set_distance_from(finish);
         s
@@ -126,10 +137,7 @@ impl State {
         let mut new_state = self.clone();
         new_state.pos.0 = try_move_single(new_state.pos.0, dx, grid[0].len())?;
         new_state.pos.1 = try_move_single(new_state.pos.1, dy, grid.len())?;
-        // if new_state.path.contains(&new_state.pos) {
-        //     return None;
-        // }
-        new_state.path.push(new_state.pos);
+        new_state.path.push(self.pos);
         new_state.add_heat_loss(&grid);
         new_state.set_distance_from(finish);
         Some(new_state)
