@@ -4,9 +4,18 @@ use std::collections::{BinaryHeap, HashSet};
 fn main() {
     const INPUT: &[u8; 20021] = include_bytes!("../input.txt");
     println!("{}", run_1(INPUT));
+    println!("{}", run_2(INPUT));
 }
 
 fn run_1(input: &[u8]) -> usize {
+    run(input, 1, 3)
+}
+
+fn run_2(input: &[u8]) -> usize {
+    run(input, 4, 10)
+}
+
+fn run(input: &[u8], min: usize, max: usize) -> usize {
     let grid = input.split(|b| *b == b'\n').collect::<Vec<_>>();
     let start = (0, 0);
     let finish = (grid.len() - 1, grid[0].len() - 1);
@@ -36,9 +45,11 @@ fn run_1(input: &[u8]) -> usize {
         for &(dx, dy) in moves.difference(&diff) {
             let mut prev_state = state.clone();
 
-            for _ in 0..3 {
+            for i in 1..=max {
                 if let Some(new_state) = prev_state.try_move((dx, dy), &grid, finish) {
-                    queue.push(Reverse(new_state.clone()));
+                    if i >= min {
+                        queue.push(Reverse(new_state.clone()));
+                    }
                     prev_state = new_state.clone();
                 } else {
                     break;
@@ -140,6 +151,11 @@ mod tests {
     #[test]
     fn challenge_1() {
         assert_eq!(run_1(INPUT), 102);
+    }
+
+    #[test]
+    fn challenge_2() {
+        assert_eq!(run_2(INPUT), 94);
     }
 
     #[test]
