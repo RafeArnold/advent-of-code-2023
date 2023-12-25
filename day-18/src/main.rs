@@ -1,6 +1,3 @@
-use std::cmp::{max, min};
-use std::collections::{BTreeMap, BTreeSet};
-
 fn main() {
     const INPUT: &str = include_str!("../input.txt");
     println!("{}", run_1(INPUT));
@@ -16,125 +13,40 @@ fn run_2(input: &str) -> usize {
 }
 
 fn run(input: &str, parse_line: fn(&str) -> Instruction) -> usize {
-    let edges = find_edges(input.lines().map(parse_line));
-    count_interior(&edges)
+    let (points, perimeter) = find_points(input.lines().map(parse_line));
+    let area = shoelace_formula(&points);
+    picks_theorem(area, perimeter)
 }
 
-fn find_edges(instructions: impl Iterator<Item = Instruction>) -> Edges {
-    let mut edges = Edges::default();
+fn find_points(instructions: impl Iterator<Item = Instruction>) -> (Vec<(i64, i64)>, usize) {
+    let mut points = Vec::new();
     let mut pos = (0, 0);
+    let mut perimeter = 0;
     for (direction, distance) in instructions {
-        if direction % 2 == 1 {
-            let d = -(direction - 2) % 2;
-            let range = (pos.1, pos.1 + d * distance);
-            edges
-                .vertical_edges
-                .entry(pos.0)
-                .or_default()
-                .insert((min(range.0, range.1), max(range.0, range.1)));
-            pos.1 += d * distance;
-        } else {
-            let d = -(direction - 1) % 2;
-            let range = (pos.0, pos.0 + d * distance);
-            edges
-                .horizontal_edges
-                .entry(pos.1)
-                .or_default()
-                .insert((min(range.0, range.1), max(range.0, range.1)));
-            pos.0 += d * distance;
-        }
+        let dx = -(direction - 1) % 2;
+        let dy = -(direction - 2) % 2;
+        pos.0 += dx * distance;
+        pos.1 += dy * distance;
+        points.push(pos);
+        perimeter += distance as usize;
     }
     assert_eq!(pos, (0, 0)); // We're back at the start.
-    edges
+    (points, perimeter)
 }
 
-fn count_interior(edges: &Edges) -> usize {
-    let mut count = 0;
-
-    let (min_x, _max_x) = edges.horizontal_boundaries();
-    let (min_y, max_y) = edges.vertical_boundaries();
-
-    for y in min_y..=max_y {
-        let mut inside = false;
-        // We're going to assume the edges of the loop do not touch or intersect.
-        let mut x = min_x - 1;
-        while let Some((&edge_x, &(edge_from_y, edge_to_y))) =
-            // Find the first vertical edge that intersects with y.
-            edges
-                .vertical_edges
-                .range(x + 1..)
-                .find_map(|(idx, ranges)| {
-                    ranges
-                        .range(..=(y, max_y))
-                        .rfind(|(min, max)| y >= *min && y <= *max)
-                        .map(|range| (idx, range))
-                })
-        {
-            if inside {
-                // Add the interior space from our current position to the next edge to the count.
-                count += (edge_x - x - 1) as usize;
-            }
-            // Move our current position to the edge.
-            x = edge_x;
-            // Add the edge's square to the count.
-            count += 1;
-            if edge_from_y == y || edge_to_y == y {
-                // We're on one end of the edge.
-                // Find the connected horizontal edge.
-                let &(_, connected_horizontal_edge_end) = edges
-                    .horizontal_edges
-                    .get(&y)
-                    .unwrap()
-                    .range((x, i32::MIN)..)
-                    .next()
-                    .unwrap();
-                // Add the length of the edge to the count.
-                count += (connected_horizontal_edge_end - x) as usize;
-                x = connected_horizontal_edge_end;
-                // Find the connected vertical edge at the end of the horizontal edge.
-                let &(connected_vertical_edge_from_y, connected_vertical_edge_to_y) = edges
-                    .vertical_edges
-                    .get(&x)
-                    .unwrap()
-                    .range(..=(y, i32::MAX))
-                    .next_back()
-                    .unwrap();
-                if (edge_from_y == y && connected_vertical_edge_to_y == y)
-                    || (edge_to_y == y && connected_vertical_edge_from_y == y)
-                {
-                    // Both vertical edges continue in the same direction, so we are passing from the outside to the inside, or vice versa.
-                    inside = !inside;
-                }
-            } else {
-                // We're in the middle of the edge, so we are definitely passing from the outside to the inside, or vice versa.
-                inside = !inside;
-            }
-        }
-    }
-
-    count
+fn shoelace_formula(points: &Vec<(i64, i64)>) -> usize {
+    (0..points.len())
+        .map(|i| {
+            let (x0, y0) = points[i];
+            let (x1, y1) = points[(i + 1) % points.len()];
+            (y0 + y1) * (x0 - x1)
+        })
+        .sum::<i64>() as usize
+        / 2
 }
 
-#[derive(Debug, Default)]
-struct Edges {
-    horizontal_edges: BTreeMap<i32, BTreeSet<(i32, i32)>>,
-    vertical_edges: BTreeMap<i32, BTreeSet<(i32, i32)>>,
-}
-
-impl Edges {
-    fn vertical_boundaries(&self) -> (i32, i32) {
-        Self::boundaries(&self.horizontal_edges)
-    }
-
-    fn horizontal_boundaries(&self) -> (i32, i32) {
-        Self::boundaries(&self.vertical_edges)
-    }
-
-    fn boundaries(edges: &BTreeMap<i32, BTreeSet<(i32, i32)>>) -> (i32, i32) {
-        let min = *edges.keys().min().unwrap();
-        let max = *edges.keys().max().unwrap();
-        (min, max)
-    }
+fn picks_theorem(area: usize, perimeter: usize) -> usize {
+    area + perimeter / 2 + 1
 }
 
 fn parse_line_1(line: &str) -> Instruction {
@@ -156,11 +68,11 @@ fn parse_line_2(line: &str) -> Instruction {
     let (distance, direction) = instruction.split_at(instruction.len() - 1);
     (
         direction.parse().unwrap(),
-        i32::from_str_radix(distance, 16).unwrap(),
+        i64::from_str_radix(distance, 16).unwrap(),
     )
 }
 
-type Instruction = (i32, i32);
+type Instruction = (i64, i64);
 
 #[cfg(test)]
 mod tests {
