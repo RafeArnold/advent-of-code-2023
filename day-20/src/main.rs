@@ -1,12 +1,17 @@
 // You could definitely solve this problem using bitwise operations.
 
 use crate::ModuleKind::{Broadcast, Conjunction, FlipFlop};
+use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
 fn main() {
     const INPUT: &str = include_str!("../input.txt");
     println!("{}", run_1(INPUT));
+    println!("{}", run_2(INPUT));
 }
+
+const START_MODULES: Lazy<HashMap<&str, (Vec<&str>, bool)>> =
+    Lazy::new(|| HashMap::from([("button", (vec!["broadcaster"], false))]));
 
 fn run_1(input: &str) -> usize {
     let mut modules_config = parse_input(input);
@@ -14,17 +19,13 @@ fn run_1(input: &str) -> usize {
     let mut high_signals_sent = 0;
     for _ in 0..1000 {
         low_signals_sent += 1;
-        let mut modules = HashMap::from([("button", (vec!["broadcaster"], false))]);
+        let mut modules = START_MODULES.clone();
         while !modules.is_empty() {
             let mut next_modules = HashMap::new();
             for (sender, (destinations, pulse)) in modules {
                 for destination in destinations {
                     if let Some((next_destinations, next_pulse)) =
-                        modules_config.get_mut(destination).and_then(|module| {
-                            module
-                                .receive(sender, pulse)
-                                .map(|next_pulse| (module.destinations.clone(), next_pulse))
-                        })
+                        send(&mut modules_config, sender, destination, pulse)
                     {
                         if next_pulse {
                             high_signals_sent += next_destinations.len();
@@ -39,6 +40,64 @@ fn run_1(input: &str) -> usize {
         }
     }
     high_signals_sent * low_signals_sent
+}
+
+fn run_2(input: &str) -> usize {
+    let mut modules_config = parse_input(input);
+    let rx_sender = *modules_config
+        .iter()
+        .find_map(|(sender, destination_module)| {
+            if destination_module.destinations.contains(&"rx") {
+                Some(sender)
+            } else {
+                None
+            }
+        })
+        .unwrap();
+    let mut button_presses = 0;
+    let mut first_high_signals = HashMap::new();
+    let mut high_signal_periods = HashMap::new();
+    loop {
+        button_presses += 1;
+        let mut modules = START_MODULES.clone();
+        while !modules.is_empty() {
+            let mut next_modules = HashMap::new();
+            for (sender, (destinations, pulse)) in modules {
+                for destination in destinations {
+                    if destination == rx_sender && pulse {
+                        if let Some(first_high_signal) =
+                            first_high_signals.insert(sender, button_presses)
+                        {
+                            let period = button_presses - first_high_signal;
+                            high_signal_periods.insert(sender, period);
+                            if high_signal_periods.len() == 4 {
+                                return high_signal_periods.values().product();
+                            }
+                        }
+                    }
+                    if let Some((next_destinations, next_pulse)) =
+                        send(&mut modules_config, sender, destination, pulse)
+                    {
+                        next_modules.insert(destination, (next_destinations, next_pulse));
+                    }
+                }
+            }
+            modules = next_modules;
+        }
+    }
+}
+
+fn send<'a>(
+    modules_config: &mut HashMap<&'a str, Module<'a>>,
+    sender: &'a str,
+    destination: &'a str,
+    pulse: bool,
+) -> Option<(Vec<&'a str>, bool)> {
+    modules_config.get_mut(destination).and_then(|module| {
+        module
+            .receive(sender, pulse)
+            .map(|next_pulse| (module.destinations.clone(), next_pulse))
+    })
 }
 
 fn parse_input(input: &str) -> HashMap<&str, Module> {
