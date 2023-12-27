@@ -10,7 +10,7 @@ fn main() {
     println!("{}", run_2(INPUT));
 }
 
-const START_MODULES: Lazy<HashMap<&str, (Vec<&str>, bool)>> =
+static START_MODULES: Lazy<HashMap<&str, (Vec<&str>, bool)>> =
     Lazy::new(|| HashMap::from([("button", (vec!["broadcaster"], false))]));
 
 fn run_1(input: &str) -> usize {
