@@ -36,7 +36,7 @@ fn arrangements0(
     groups: Vec<u8>,
     current_group_size: Option<u8>,
 ) -> usize {
-    match conditions.get(0) {
+    match conditions.first() {
         None => {
             if groups.is_empty() || (groups.len() == 1 && current_group_size == Some(groups[0])) {
                 // We've reached the end of the row and all the groups have been filled.
