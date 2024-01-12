@@ -1,12 +1,28 @@
 fn main() {
     const INPUT: &str = include_str!("../input.txt");
     println!("{}", run_1(INPUT));
+    println!("{}", run_2(INPUT));
 }
 
 fn run_1(input: &str) -> usize {
     let mut bricks = parse_input(input);
-    bricks = fall(bricks);
+    bricks.sort_unstable_by_key(|brick| brick.start.z);
+    let (bricks, _) = fall(bricks);
     disintegrate(&bricks)
+}
+
+fn run_2(input: &str) -> usize {
+    let mut bricks = parse_input(input);
+    bricks.sort_unstable_by_key(|brick| brick.start.z);
+    let (bricks, _) = fall(bricks);
+    let mut sum = 0;
+    for i in 0..bricks.len() {
+        let mut bricks = bricks.clone();
+        bricks.remove(i);
+        let (_, count) = fall(bricks);
+        sum += count;
+    }
+    sum
 }
 
 fn disintegrate(bricks: &Vec<Brick>) -> usize {
@@ -51,9 +67,9 @@ fn count_supports(brick: &Brick, bricks_sorted_by_end: &[Vec<&Brick>]) -> usize 
         .count()
 }
 
-fn fall(mut bricks: Vec<Brick>) -> Vec<Brick> {
-    bricks.sort_unstable_by_key(|brick| brick.start.z);
+fn fall(bricks: Vec<Brick>) -> (Vec<Brick>, usize) {
     let mut fallen = Vec::<Brick>::new();
+    let mut count = 0;
     for mut brick in bricks {
         // Find the highest fallen brick underneath this brick.
         let to_move = if let Some(z) = fallen
@@ -67,11 +83,14 @@ fn fall(mut bricks: Vec<Brick>) -> Vec<Brick> {
         } else {
             brick.start.z - 1
         };
+        if to_move != 0 {
+            count += 1;
+        }
         brick.start.z -= to_move;
         brick.end.z -= to_move;
         fallen.push(brick);
     }
-    fallen
+    (fallen, count)
 }
 
 impl Brick {
@@ -104,6 +123,7 @@ fn parse_coords(coords: &str) -> Coords {
     )
 }
 
+#[derive(Clone)]
 struct Brick {
     start: Coords,
     end: Coords,
@@ -115,6 +135,7 @@ impl Brick {
     }
 }
 
+#[derive(Clone)]
 struct Coords {
     x: usize,
     y: usize,
@@ -142,5 +163,10 @@ mod tests {
     #[test]
     fn challenge_1() {
         assert_eq!(run_1(INPUT), 5);
+    }
+
+    #[test]
+    fn challenge_2() {
+        assert_eq!(run_2(INPUT), 7);
     }
 }
